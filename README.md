@@ -39,7 +39,7 @@ sudo apt install ffmpeg
 
 1. Clone this repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/PierrunoYT/youtube-video-summarizer.git
 cd youtube-video-summarizer
 ```
 
