@@ -4,23 +4,16 @@ This tool allows you to get AI-generated summaries of YouTube videos using their
 
 ## Features
 - Extract transcripts from YouTube videos using OpenAI's Whisper API
-- Generate concise summaries using AI
-- Support for multiple AI models via OpenRouter
+- Generate concise summaries using AI via the OpenRouter API
 - Automatic audio transcription for videos without subtitles
 - Simple web interface for easy use
 
 ## Prerequisites
-- Python 3.8 or higher (Python 3.8 - 3.11 recommended for best compatibility)
+- Python 3.8 or higher (Python 3.8 - 3.11 recommended)
 - pip (Python package installer)
 - FFmpeg (required for audio processing)
-- OpenAI API key (for Whisper transcription)
-- OpenRouter API key (for AI summarization)
-- For GPU acceleration:
-  - Windows/Linux: NVIDIA GPU with CUDA support (recommended for faster transcription)
-    - NVIDIA drivers version 525.60.13 (Linux) or 527.41 (Windows) or newer
-    - CUDA 11.8 compatible GPU (most RTX 20xx, 30xx, 40xx series cards)
-  - Mac: Apple Silicon (M1/M2) for Metal acceleration support
-    - Intel Macs will run in CPU-only mode
+- OpenAI API key (for Whisper transcription via API)
+- OpenRouter API key (for AI summarization via API)
 
 ### Installing FFmpeg
 
@@ -42,24 +35,6 @@ sudo apt update
 sudo apt install ffmpeg
 ```
 
-### GPU Support Setup
-
-#### Windows/Linux (NVIDIA GPUs)
-1. Visit [NVIDIA Driver Downloads](https://www.nvidia.com/Download/index.aspx)
-2. Select your GPU model and download the latest driver
-3. Run the installer and follow the instructions
-4. Verify installation: `nvidia-smi`
-
-#### Linux (Ubuntu/Debian)
-```bash
-sudo apt update
-sudo apt install nvidia-driver-525  # or newer version
-```
-
-#### macOS
-- Apple Silicon (M1/M2) Macs: No additional setup needed, Metal support is built-in
-- Intel Macs: Will run in CPU-only mode, no GPU acceleration available
-
 ## Setup
 
 1. Clone this repository:
@@ -68,7 +43,7 @@ git clone <repository-url>
 cd youtube-video-summarizer
 ```
 
-2. Set up Python virtual environment:
+2. Set up a Python virtual environment.
 
 First, make sure you have the right Python version installed:
 ```bash
@@ -104,11 +79,6 @@ source venv/bin/activate
 python --version
 ```
 
-If you see a "command not found" error, make sure Python and venv are installed:
-- Ubuntu/Debian: `sudo apt install python3-venv`
-- macOS: `brew install python@3.11`  # or your preferred version
-- Windows: Download Python from python.org and check "Add Python to PATH" during installation
-
 3. Install dependencies:
 ```bash
 # Upgrade pip first (recommended)
@@ -118,24 +88,11 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Note on GPU Support:
-- Windows/Linux with NVIDIA GPUs: PyTorch 2.1.0 with CUDA 11.8 support will be installed
-- Apple Silicon Macs: PyTorch will use Metal Performance Shaders (MPS) for acceleration
-- Intel Macs: PyTorch will run in CPU-only mode
-
-If you encounter GPU-related issues:
-- Windows/Linux (NVIDIA):
-  - Verify your NVIDIA drivers are up to date
-  - Check CUDA compatibility with `python -c "import torch; print(torch.cuda.is_available())"`
-  - For NCCL errors, set this environment variable: `NCCL_P2P_DISABLE=1`
-- Apple Silicon Macs:
-  - Verify MPS availability: `python -c "import torch; print(torch.backends.mps.is_available())"`
-
 4. Create a `.env` file in the root directory:
 ```
 # Required
-OPENAI_API_KEY=your_openai_api_key_here  # For Whisper transcription
-OPENROUTER_API_KEY=your_openrouter_api_key_here  # For AI summarization
+OPENAI_API_KEY=your_openai_api_key_here  # For Whisper transcription via API
+OPENROUTER_API_KEY=your_openrouter_api_key_here  # For AI summarization via API
 
 # Optional - defaults shown
 SITE_URL=http://127.0.0.1:5000
@@ -159,37 +116,22 @@ python app.py
 4. Click "Get Summary" to generate a summary
 
 ## Notes
-- The application uses OpenAI's Whisper API for transcription
+- The application uses OpenAI's Whisper API for transcription via API
   - Maximum audio file size: 25MB
   - Supported formats: MP3, MP4, MPEG, MPGA, M4A, WAV, WEBM
   - For longer videos, consider splitting into chunks (feature coming soon)
 - Processing time depends on:
   - Video length (and resulting audio file size)
-  - Chosen AI model for summarization
+  - Chosen summarization model (via API)
   - API response times
 - API usage costs are determined by:
   - Whisper API usage (OpenAI pricing)
   - Selected summarization model (OpenRouter pricing)
-- The video must have closed captions/subtitles available
-- If subtitles are not available, the app will automatically transcribe the audio using Whisper
+- The video must have closed captions/subtitles available; if not, the app automatically transcribes the audio using Whisper
   - First time running may take longer as it downloads the Whisper model (~2GB)
-  - Transcription speed depends on your hardware:
-    - NVIDIA GPUs: Fastest with CUDA acceleration
-    - Apple Silicon (M1/M2): Good performance with Metal acceleration
-    - CPU only (Intel Macs/other): Slower but functional
-- Processing time may vary depending on video length and chosen AI model
+  - Transcription speed depends on your internet connection and hardware
 
 ## Troubleshooting
-
-### GPU/PyTorch Issues
-- Windows/Linux (NVIDIA):
-  - Run `python -c "import torch; print(torch.cuda.is_available())"` to verify CUDA setup
-  - Check GPU detection: `nvidia-smi`
-  - Ensure you have compatible NVIDIA drivers installed
-  - For NCCL errors, try setting: `export NCCL_P2P_DISABLE=1`
-- Mac:
-  - Apple Silicon: Run `python -c "import torch; print(torch.backends.mps.is_available())"` to verify Metal support
-  - Intel Macs: Will run in CPU-only mode, expect slower performance
 
 ### FFmpeg Issues
 - Windows: Ensure FFmpeg is in your PATH
@@ -202,16 +144,12 @@ python app.py
 
 ### API Issues
 - Verify your OpenRouter API key is correct
-- Check API credit balance and rate limits at https://openrouter.ai/keys
+- Check API credit balance and rate limits at [OpenRouter Keys](https://openrouter.ai/keys)
 - Ensure your environment variables are properly set
 
 ### Whisper Issues
-- Ensure you have enough disk space (~2GB) for the Whisper model
-- Performance expectations:
-  - NVIDIA GPU: Fastest transcription with CUDA
-  - Apple Silicon: Good performance with Metal
-  - CPU only (Intel Macs/other): Functional but slower
-- If you encounter memory issues, try using a smaller Whisper model by modifying the code
+- Ensure you have enough disk space (~2GB) for the Whisper model download (handled by the API)
+- If you encounter memory issues, try modifying the code to use a smaller Whisper model variant
 
 ## License
 MIT License © 2025 PierrunoYT
