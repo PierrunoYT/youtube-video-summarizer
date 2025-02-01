@@ -1,0 +1,14 @@
+flask
+flask-cors
+python-dotenv
+requests
+openai
+yt-dlp
+openai-whisper
+markdown2
+--index-url https://download.pytorch.org/whl/cu118
+torch==2.1.0+cu118
+torchvision
+torchaudio
+numpy
+ffmpeg-python 

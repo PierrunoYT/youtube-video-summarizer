@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Summarizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Add Select2 for better dropdown experience -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto">
+            <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">YouTube Video Summarizer</h1>
+            
+            <!-- API Status Section -->
+            <div id="api-status" class="mb-6 p-4 bg-white rounded-lg shadow-lg">
+                <h2 class="text-lg font-semibold mb-2">API Status</h2>
+                <div class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="font-medium">Credits Used:</span>
+                        <span id="credits-used">Loading...</span>
+                    </div>
+                    <div>
+                        <span class="font-medium">Credit Limit:</span>
+                        <span id="credit-limit">Loading...</span>
+                    </div>
+                    <div>
+                        <span class="font-medium">Rate Limit:</span>
+                        <span id="rate-limit">Loading...</span>
+                    </div>
+                    <div>
+                        <span class="font-medium">Account Type:</span>
+                        <span id="account-type">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <div class="mb-4">
+                    <label for="video-url" class="block text-sm font-medium text-gray-700 mb-2">YouTube Video URL</label>
+                    <input type="text" id="video-url" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="https://www.youtube.com/watch?v=...">
+                </div>
+
+                <div class="mb-4">
+                    <label for="model-select" class="block text-sm font-medium text-gray-700 mb-2">Select AI Model</label>
+                    <select id="model-select" class="w-full">
+                        <option value="">Loading models...</option>
+                    </select>
+                    <div class="mt-1 text-sm text-gray-500">
+                        <span id="model-info"></span>
+                    </div>
+                </div>
+                
+                <button onclick="getSummary()" 
+                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    Get Summary
+                </button>
+
+                <div id="loading" class="hidden mt-4">
+                    <div class="flex items-center justify-center">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span class="ml-2 text-gray-600">Generating summary...</span>
+                    </div>
+                </div>
+
+                <div id="error" class="hidden mt-4 p-4 bg-red-100 text-red-700 rounded-md"></div>
+
+                <div id="result" class="hidden mt-4 space-y-4">
+                    <div>
+                        <h2 class="text-xl font-semibold mb-2 text-gray-800">Summary</h2>
+                        <div id="summary" class="prose text-gray-600 whitespace-pre-line"></div>
+                    </div>
+                    
+                    <div>
+                        <h2 class="text-xl font-semibold mb-2 text-gray-800">Key Points</h2>
+                        <ul id="key-points" class="list-disc pl-5 text-gray-600"></ul>
+                    </div>
+                    
+                    <div>
+                        <h2 class="text-xl font-semibold mb-2 text-gray-800">Topics Covered</h2>
+                        <div id="topics" class="flex flex-wrap gap-2"></div>
+                    </div>
+
+                    <!-- Generation Stats Section -->
+                    <div id="generation-stats" class="mt-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Generation Statistics</h3>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="font-medium">Prompt Tokens:</span>
+                                <span id="prompt-tokens">-</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">Completion Tokens:</span>
+                                <span id="completion-tokens">-</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">Total Cost:</span>
+                                <span id="total-cost">-</span>
+                            </div>
+                            <div>
+                                <span class="font-medium">Cache Savings:</span>
+                                <span id="cache-savings">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Select2 for model selection
+        $(document).ready(function() {
+            $('#model-select').select2({
+                placeholder: 'Search for a model...',
+                allowClear: true,
+                ajax: {
+                    url: '/api/models/search',
+                    delay: 250,
+                    data: function(params) {
+                        return {
+                            q: params.term
+                        };
+                    },
+                    processResults: function(data) {
+                        return {
+                            results: Object.entries(data).map(([id, model]) => ({
+                                id: id,
+                                text: model.name,
+                                model: model
+                            }))
+                        };
+                    }
+                }
+            }).on('select2:select', function(e) {
+                const model = e.params.data.model;
+                updateModelInfo(model);
+            });
+
+            // Load initial models
+            loadModels();
+        });
+
+        async function loadModels() {
+            try {
+                const response = await fetch('/api/models');
+                const models = await response.json();
+                
+                const select = $('#model-select');
+                select.empty();
+                
+                Object.entries(models).forEach(([id, model]) => {
+                    const option = new Option(model.name, id, false, false);
+                    select.append(option);
+                });
+            } catch (error) {
+                console.error('Error loading models:', error);
+            }
+        }
+
+        function updateModelInfo(model) {
+            const info = [];
+            if (model.context_length) {
+                info.push(`Context: ${model.context_length.toLocaleString()} tokens`);
+            }
+            if (model.pricing) {
+                const prompt = model.pricing.prompt;
+                const completion = model.pricing.completion;
+                if (prompt) info.push(`Prompt: $${prompt}/token`);
+                if (completion) info.push(`Completion: $${completion}/token`);
+            }
+            document.getElementById('model-info').textContent = info.join(' | ');
+        }
+
+        // Update API status periodically
+        async function updateAPIStatus() {
+            try {
+                const response = await fetch('/api-status');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('credits-used').textContent = data.usage || '0';
+                    document.getElementById('credit-limit').textContent = data.limit || 'Unlimited';
+                    document.getElementById('rate-limit').textContent = 
+                        `${data.rate_limit?.requests || '0'} per ${data.rate_limit?.interval || 'N/A'}`;
+                    document.getElementById('account-type').textContent = 
+                        data.is_free_tier ? 'Free Tier' : 'Paid Account';
+                } else {
+                    throw new Error(data.error || 'Could not fetch API status');
+                }
+            } catch (error) {
+                console.error('Error updating API status:', error);
+            }
+        }
+
+        // Update status every 30 seconds
+        updateAPIStatus();
+        setInterval(updateAPIStatus, 30000);
+
+        function updateGenerationStats(stats) {
+            if (stats) {
+                document.getElementById('prompt-tokens').textContent = stats.tokens_prompt;
+                document.getElementById('completion-tokens').textContent = stats.tokens_completion;
+                document.getElementById('total-cost').textContent = `$${stats.total_cost.toFixed(4)}`;
+                document.getElementById('cache-savings').textContent = 
+                    stats.cache_discount ? `$${Math.abs(stats.cache_discount).toFixed(4)}` : '$0.0000';
+                document.getElementById('generation-stats').classList.remove('hidden');
+            } else {
+                document.getElementById('generation-stats').classList.add('hidden');
+            }
+        }
+
+        async function getSummary() {
+            const url = document.getElementById('video-url').value.trim();
+            const model = $('#model-select').val();
+
+            if (!url) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+
+            if (!model) {
+                showError('Please select an AI model');
+                return;
+            }
+
+            // Show loading, hide other states
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('error').classList.add('hidden');
+            document.getElementById('result').classList.add('hidden');
+            document.getElementById('generation-stats').classList.add('hidden');
+
+            try {
+                const response = await fetch('/summarize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        video_url: url,
+                        model: model
+                    }),
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate summary');
+                }
+
+                // Update the summary section with HTML content
+                document.getElementById('summary').innerHTML = data.summary_html;
+
+                // Update key points
+                const keyPointsList = document.getElementById('key-points');
+                keyPointsList.innerHTML = '';
+                if (data.key_points && Array.isArray(data.key_points)) {
+                    data.key_points.forEach(point => {
+                        const li = document.createElement('li');
+                        li.textContent = point;
+                        keyPointsList.appendChild(li);
+                    });
+                }
+
+                // Update topics
+                const topicsContainer = document.getElementById('topics');
+                topicsContainer.innerHTML = '';
+                if (data.topics && Array.isArray(data.topics)) {
+                    data.topics.forEach(topic => {
+                        const tag = document.createElement('span');
+                        tag.className = 'px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm';
+                        tag.textContent = topic;
+                        topicsContainer.appendChild(tag);
+                    });
+                }
+
+                // Update generation stats if available
+                updateGenerationStats(data.stats);
+
+                document.getElementById('result').classList.remove('hidden');
+                
+                // Update API status after summary generation
+                updateAPIStatus();
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html> 
